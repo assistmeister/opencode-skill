@@ -1,5 +1,7 @@
 # opencode-skill
 
+> Fork of [pcx-wave/opencode-skill](https://github.com/pcx-wave/opencode-skill) (MIT). Adds upstream [PR 1](https://github.com/pcx-wave/opencode-skill/pull/1) (OpenCode v1/v2 support), LF line endings for Windows checkouts, and `opencode-go/deepseek-v4.1-flash#high` as the default model.
+
 ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
 
 **Claude orchestrates. OpenCode codes. You review the diff.**
@@ -170,6 +172,7 @@ OpenCode's internal tool calls consume **OpenCode tokens**, not Claude tokens.
 Claude only receives the compressed final output (~200-800 tokens/run).
 
 **Pricing depends on the model used:**
+- `opencode-go/deepseek-v4.1-flash#high` — **default**, OpenCode Go subscription; the Go docs list no training and 0-day retention
 - `opencode/glm-5.3-flash-free` — **free**, no API key needed (may have queue delays)
 - `google/gemini-2.5-flash` — requires `GOOGLE_GENERATIVE_AI_API_KEY` env var
 

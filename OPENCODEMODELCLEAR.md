@@ -11,4 +11,4 @@ allowed-tools:
 
 Run: `rm -f ~/.local/share/opencode-model.flag`
 
-Then confirm: "OpenCode model override cleared — back to default (opencode/deepseek-v4-flash-free)."
+Then confirm: "OpenCode model override cleared — back to default (opencode-go/deepseek-v4.1-flash#high)."

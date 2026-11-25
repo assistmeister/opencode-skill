@@ -49,7 +49,7 @@ ln -sf "$(pwd)/SKILL.md" ~/.claude/skills/opencode/SKILL.md
 ## `tools/opencode-delegate` design
 
 ### Shell wrapper
-- Args: `workdir`, `prompt`, `timeout-secs` (default 300), `model` (default `opencode/deepseek-v4-flash-free`)
+- Args: `workdir`, `prompt`, `timeout-secs` (default 300), `model` (default `opencode-go/deepseek-v4.1-flash#high`)
 - Prompt → temp file (shell injection safety)
 - Track git HEAD + file list before run
 - Launch: `timeout $TIMEOUT opencode run $PROMPT --format json --dangerously-skip-permissions --model $MODEL --dir $WORKDIR`

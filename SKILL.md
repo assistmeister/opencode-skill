@@ -79,8 +79,8 @@ The delegate script `cd`s into the workdir (v2 has no `--dir`). Requires GNU `ti
 ### 4. No pseudo-TTY needed
 Plain pipe — no `script -q -c` wrapper required.
 
-### 5. Free model queue delays
-`opencode/glm-5.3-flash-free` — no API key cost; may queue during peak usage.
+### 5. Model and data retention
+`opencode-go/deepseek-v4.1-flash#high` — OpenCode Go subscription; the Go docs list no training and 0-day retention (DeepSeek ZDR agreement renewed monthly, recheck opencode.ai/docs/go). Needs the Global region enabled in workspace Settings > Privacy.
 
 ### 6. Orchestration chain — 5 failure points
 
@@ -199,7 +199,7 @@ VERIFY: grep for "datetime.date" in app.py and confirm it exists.
 | `workdir`      | —       | Absolute path, must exist |
 | `prompt`       | —       | Self-contained task description |
 | `timeout-secs` | `300`   | Wall-clock kill timer |
-| `model`        | `opencode/glm-5.3-flash-free` | OpenCode model string |
+| `model`        | `opencode-go/deepseek-v4.1-flash#high` | OpenCode model string |
 
 **Recommended timeouts:**
 - Explore only: `120`
@@ -207,7 +207,8 @@ VERIFY: grep for "datetime.date" in app.py and confirm it exists.
 - Medium change (2–3 files): `300`
 
 **Model selection:**
-- `opencode/glm-5.3-flash-free` (default) — free, no API key needed, may have queue delays
+- `opencode-go/deepseek-v4.1-flash#high` (default) — OpenCode Go subscription; the Go docs list no training and 0-day retention (DeepSeek ZDR agreement renewed monthly, recheck opencode.ai/docs/go). Needs the Global region enabled in workspace Settings > Privacy.
+- `opencode/glm-5.3-flash-free` — free, no API key needed, may have queue delays
 - `google/gemini-2.5-flash` — cheap, fast (requires `GOOGLE_GENERATIVE_AI_API_KEY`)
 
 **Examples:**
@@ -228,7 +229,7 @@ The script prints live:
 ```
 === OPENCODE START ===
 Workdir : /path/to/project
-Model   : opencode/glm-5.3-flash-free
+Model   : opencode-go/deepseek-v4.1-flash#high
 CLI     : opencode v2.0.32 (--auto)
 Timeout : 300s
 Prompt  : Stack: Python/Flask. File: app.py ...

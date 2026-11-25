@@ -17,7 +17,8 @@ Available models (from `opencode models`):
 
 | Model | Notes |
 |-------|-------|
-| `opencode/glm-5.3-flash-free` | Free, default — no API key needed |
+| `opencode-go/deepseek-v4.1-flash#high` | Default — OpenCode Go subscription, ZDR per the Go docs |
+| `opencode/glm-5.3-flash-free` | Free, no API key needed |
 | `opencode/deepseek-v4.1-flash-free` | Free |
 | `opencode/big-pickle` | Free |
 | `opencode/nemotron-3-super-free` | Free |
