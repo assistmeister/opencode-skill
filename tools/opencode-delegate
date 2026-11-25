@@ -80,12 +80,13 @@ PROMPT_CONTENT=$(cat "$PROMPT_FILE")
 
 # Run opencode in non-interactive mode, streaming JSON events.
 # opencode works fine in a plain pipe — no pseudo-TTY needed.
+# stdin is closed: opencode v2 reads a non-TTY stdin as extra prompt input and waits for EOF.
 export OPENCODE_RUN_MODE="opencode-delegate"
 timeout "$TIMEOUT_SECS" opencode run "$PROMPT_CONTENT" \
   --format json \
   "${OC_FLAGS[@]}" \
   --model "$MODEL" \
-  2>&1 | python3 -c "
+  < /dev/null 2>&1 | python3 -c "
 import sys, json, os
 
 tool_calls = 0
