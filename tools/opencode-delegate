@@ -46,10 +46,21 @@ if [ -z "$TIMEOUT_BIN" ] || ! "$TIMEOUT_BIN" 1 true >/dev/null 2>&1; then
   exit 1
 fi
 
+# opencode may be installed but absent from a non-interactive PATH (common for
+# host shells). Fall back to its default install location.
+OPENCODE_BIN=$(command -v opencode || true)
+if [ -z "$OPENCODE_BIN" ] && [ -x "$HOME/.opencode/bin/opencode" ]; then
+  OPENCODE_BIN="$HOME/.opencode/bin/opencode"
+fi
+if [ -z "$OPENCODE_BIN" ]; then
+  echo "ERROR: opencode CLI not found (install from https://opencode.ai)" >&2
+  exit 1
+fi
+
 # Detect run flags from `opencode run --help` — they changed within v1, not at v2:
 #   <=1.15: --dangerously-skip-permissions, --dir   1.19: --auto, --dir   2.x: --auto only
-OC_VERSION=$(opencode --version 2>/dev/null | head -1)
-OC_HELP=$(opencode run --help 2>&1)
+OC_VERSION=$("$OPENCODE_BIN" --version 2>/dev/null | head -1)
+OC_HELP=$("$OPENCODE_BIN" run --help 2>&1)
 OC_FLAGS=()
 if printf '%s' "$OC_HELP" | grep -q -- '--dangerously-skip-permissions'; then
   OC_FLAGS+=(--dangerously-skip-permissions)
@@ -97,7 +108,7 @@ PROMPT_CONTENT=$(cat "$PROMPT_FILE")
 # block forever after opencode exits and the caller never gets an exit code.
 # stdin is closed: opencode v2 reads a non-TTY stdin as extra prompt input and waits for EOF.
 export OPENCODE_RUN_MODE="opencode-delegate"
-"$TIMEOUT_BIN" "$TIMEOUT_SECS" opencode run "$PROMPT_CONTENT" \
+"$TIMEOUT_BIN" "$TIMEOUT_SECS" "$OPENCODE_BIN" run "$PROMPT_CONTENT" \
   --format json \
   "${OC_FLAGS[@]}" \
   --model "$MODEL" \
