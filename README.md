@@ -124,7 +124,7 @@ Try it in any git repo you do not mind changing:
 /opencode add a hello.py that prints "hi" and exits 0
 ```
 
-You will see the run start, a stream of events, a syntax check, and a diff. If the host asks before running the script, approve it once.
+You will see the run start, then the parsed events, the syntax check, and the diff. Output arrives when the run ends.
 
 You can also call the delegate directly, with no host involved:
 
@@ -170,7 +170,7 @@ you: /opencode <task>
                  ├─ runs: opencode run <prompt> --format json
                  │    --auto (or --dangerously-skip-permissions on old v1)
                  │    --model <model>, --dir <workdir> when the CLI supports it
-                 ├─ streams events: [read] [edit] [write] [search] [shell] [opencode]
+                 ├─ prints events: [read] [edit] [write] [search] [shell] [opencode]
                  ├─ adds up real token counts and cost
                  ├─ syntax-checks every changed .py .js .json .sh file
                  ├─ prints the git diff
@@ -211,6 +211,7 @@ Switch the model for one run with the fourth argument, or for everything with `/
 | No `--dir` in v2 | The script changes into the workdir instead. Same result. |
 | Needs GNU `timeout` | macOS: `brew install coreutils`. Windows: WSL, or Git Bash with coreutils. |
 | Antigravity sandbox | No network inside it. The delegate must run unsandboxed, as described above. |
+| Output timing | `opencode run` output is captured to a file and printed when the process exits. opencode v2 leaves service and pty daemons holding inherited stdout, so a live pipe would never close and the calling shell would hang. |
 | Windows symlinks | Git Bash copies instead of linking unless Developer Mode and `MSYS=winsymlinks:nativestrict` are set. Re-run the install loop after each pull. |
 | Frontend syntax coverage | `.ts` and `.tsx` are checked with `tsc` only when a `tsconfig.json` exists. |
 

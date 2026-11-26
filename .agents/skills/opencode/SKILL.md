@@ -217,9 +217,9 @@ a network/API error.
 
 ---
 
-## Step 5 — Supervise in real time
+## Step 5 — Supervise the run
 
-The script prints live:
+The script prints when the run ends (opencode v2 keeps background daemons alive, so output is collected and parsed after `opencode run` exits):
 ```
 === OPENCODE START ===
 Workdir : /path/to/project

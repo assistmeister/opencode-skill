@@ -70,6 +70,7 @@ SENTINEL=$(mktemp "$TMPD/opencode-sentinel.XXXXXX")
 PROMPT_FILE=$(mktemp "$TMPD/opencode-prompt.XXXXXX")
 DELEGATE_STATS_FILE=$(mktemp "$TMPD/delegate-stats.XXXXXX")
 SYNTAX_COUNT_FILE=$(mktemp "$TMPD/opencode-syntax-count.XXXXXX")
+OUT_FILE=$(mktemp "$TMPD/opencode-json.XXXXXX")
 echo 0 > "$SYNTAX_COUNT_FILE"
 
 echo "=== OPENCODE START ==="
@@ -85,24 +86,29 @@ echo "======================"
 printf '{}' > "$DELEGATE_STATS_FILE"
 export DELEGATE_STATS_FILE
 
-trap 'rm -f "$PROMPT_FILE" "$DELEGATE_STATS_FILE" "$SYNTAX_COUNT_FILE" "$SENTINEL"' EXIT
+trap 'rm -f "$PROMPT_FILE" "$DELEGATE_STATS_FILE" "$SYNTAX_COUNT_FILE" "$SENTINEL" "$OUT_FILE"' EXIT
 printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
 PROMPT_CONTENT=$(cat "$PROMPT_FILE")
 
-# Run opencode in non-interactive mode, streaming JSON events.
-# opencode works fine in a plain pipe — no pseudo-TTY needed.
+# Run opencode in non-interactive mode and capture its JSON to a file.
+# A pipe is not safe here: opencode v2 leaves a background service or pty daemon
+# holding inherited stdout, so the pipe never reaches EOF. The parser would
+# block forever after opencode exits and the caller never gets an exit code.
 # stdin is closed: opencode v2 reads a non-TTY stdin as extra prompt input and waits for EOF.
 export OPENCODE_RUN_MODE="opencode-delegate"
 "$TIMEOUT_BIN" "$TIMEOUT_SECS" opencode run "$PROMPT_CONTENT" \
   --format json \
   "${OC_FLAGS[@]}" \
   --model "$MODEL" \
-  < /dev/null 2>&1 | python3 -c "
+  < /dev/null > "$OUT_FILE" 2>&1
+OPENCODE_EXIT=$?
+
+python3 - "$OUT_FILE" "$MODEL" <<'PYPARSE'
 import sys, json, os
 
 tool_calls = 0
-model_name = '$MODEL'
+model_name = sys.argv[2] if len(sys.argv) > 2 else ''
 tokens_total = 0
 tokens_in = 0
 tokens_out = 0
@@ -111,7 +117,7 @@ tokens_cache_read = 0
 tokens_cache_write = 0
 cost_usd = 0.0
 
-for raw in sys.stdin:
+for raw in open(sys.argv[1], 'r', errors='replace'):
     line = raw.strip()
     if not line:
         continue
@@ -157,7 +163,7 @@ for raw in sys.stdin:
         elif tool in ('grep', 'search'):
             pattern = inp.get('pattern', '') or inp.get('query', '')
             print(f'  [search] {pattern[:80] or tool}', flush=True)
-        elif tool == 'bash':
+        elif tool in ('bash', 'shell'):
             cmd = inp.get('command', '') or inp.get('cmd', '')
             print(f'  [shell]  {cmd[:100] or tool}', flush=True)
         elif tool == 'glob':
@@ -166,7 +172,7 @@ for raw in sys.stdin:
         elif tool == 'todowrite':
             print(f'  [tool]   todowrite', flush=True)
         elif tool == 'skill':
-            print(f'  [tool]   skill: {inp.get(\"name\", \"\")}', flush=True)
+            print(f'  [tool]   skill: {inp.get("name", "")}', flush=True)
         else:
             print(f'  [tool]   {tool}', flush=True)
 
@@ -222,7 +228,7 @@ print(f'Tool calls: {tool_calls}')
 if tokens_total > 0:
     cached = tokens_cache_read + tokens_cache_write
     cache_str = f', {cached} cached' if cached else ''
-    print(f'OpenCode tokens: {tokens_total:,}  ({tokens_in:,} in + {tokens_out:,} out{cache_str})  |  ~\${cost_usd:.6f}')
+    print(f'OpenCode tokens: {tokens_total:,}  ({tokens_in:,} in + {tokens_out:,} out{cache_str})  |  ~${cost_usd:.6f}')
 else:
     print('(no token data available)')
 
@@ -244,8 +250,7 @@ if sf:
             json.dump(payload, wf)
     except Exception:
         pass
-"
-OPENCODE_EXIT=${PIPESTATUS[0]}
+PYPARSE
 
 echo ""
 if [ "$OPENCODE_EXIT" -eq 124 ]; then
