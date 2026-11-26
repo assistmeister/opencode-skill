@@ -1,8 +1,9 @@
 ---
 name: opencode
 description: >
-  Delegate a coding task to OpenCode CLI and supervise the result via git diff.
-  Trigger: /opencode <instruction>. Claude orchestrates, OpenCode codes.
+  Delegates a coding task to the OpenCode CLI and supervises the result via git diff.
+  Use when the user asks to write, edit, refactor or fix code through OpenCode.
+  Trigger: /opencode <instruction>. The host agent orchestrates, OpenCode codes.
   Also handles /opencodeon, /opencodeoff, /opencodestatus, /opencode-report,
   /opencode-model-pick, /opencode-model-clear.
 license: MIT
@@ -15,30 +16,18 @@ allowed-tools:
 
 ## /opencodeon | /opencodeoff | /opencodestatus
 
-Toggle auto-delegate mode — OpenCode automatically handles coding tasks without
-requiring `/opencode` each time.
+Each is its own skill in this directory — run the one the user named and stop.
 
-| Command | Action |
-|---------|--------|
-| `/opencodeon` | `touch ~/.local/share/opencode-auto.flag` → confirm "Auto-opencode ON" |
-| `/opencodeoff` | `rm -f ~/.local/share/opencode-auto.flag` → confirm "Auto-opencode OFF" |
-| `/opencodestatus` | run `test -f ~/.local/share/opencode-auto.flag && echo ON \|\| echo OFF` |
-
-Run the bash command, print one confirmation line, and stop.
+Auto-mode sets `~/.local/share/opencode-auto.flag` (read by Claude Code via `CLAUDE.md`)
+and `~/.gemini/config/rules/opencode-auto.md` (an `always_on` rule read by Antigravity).
+Both surfaces then delegate without `/opencode`. Antigravity's terminal sandbox blocks
+writes outside the workspace, so the toggle may need to run outside the sandbox once.
 
 ---
 
 ## /opencode-report
 
-If the user invokes /opencode-report, run ~/tools/delegate-report with any flags extracted from the arguments, display output verbatim, and stop.
-
-| User says | Flag |
-|-----------|------|
-| last 7 days, 7d | --since 7 |
-| last 30 days, 30d | --since 30 |
-| project foo | --project foo |
-| only failures, fails | --fails |
-| (nothing) | (no flags, full report) |
+Its own skill: `opencode-report` runs `~/tools/delegate-report` with the matching flags.
 
 ---
 
@@ -57,7 +46,7 @@ Run the bash command, print one confirmation line, and stop.
 
 # OpenCode Orchestrator
 
-When the user invokes `/opencode <instruction>`, Claude delegates the implementation
+When the user invokes `/opencode <instruction>`, the host agent delegates the implementation
 to OpenCode CLI via its headless `run` mode (`opencode run <prompt> --format json`),
 monitors in real time, and reports.
 
@@ -99,7 +88,7 @@ When a run produces unexpected results, check these links top to bottom.
 ## Step 1 — Detect workdir
 
 1. `git rev-parse --show-toplevel` in the current directory.
-2. If ambiguous or no git repo → ask with `AskUserQuestion`.
+2. If ambiguous or no git repo → ask the user in chat which workdir to use.
 
 ---
 
@@ -194,6 +183,11 @@ VERIFY: grep for "datetime.date" in app.py and confirm it exists.
 ~/tools/opencode-delegate "<workdir>" "<prompt>" [timeout-secs] [model]
 ```
 
+**Antigravity terminal sandbox**: the delegate needs network access, which the sandbox
+blocks by default. Run it outside the sandbox — approve the agent's request, or add
+`command(~/tools/opencode-delegate)` to the Allow list. Otherwise the run fails fast with
+a network/API error.
+
 | Argument       | Default | Notes |
 |----------------|---------|-------|
 | `workdir`      | —       | Absolute path, must exist |
@@ -216,9 +210,9 @@ VERIFY: grep for "datetime.date" in app.py and confirm it exists.
 # Simple change
 ~/tools/opencode-delegate "/path/to/project" "Stack: Flask. File: app.py. TASK: ..." 180
 
-# Background run
+# Background run (never `tail -f` from an agent tool — it never returns)
 ~/tools/opencode-delegate "/path/to/project" "..." 300 > /tmp/opencode_out.txt 2>&1 &
-# Monitor with: tail -f /tmp/opencode_out.txt
+# Later: read /tmp/opencode_out.txt
 ```
 
 ---
