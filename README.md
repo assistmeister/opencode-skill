@@ -1,18 +1,18 @@
 # opencode-skill
 
-> Fork of [pcx-wave/opencode-skill](https://github.com/pcx-wave/opencode-skill) (MIT). Adds upstream [PR 1](https://github.com/pcx-wave/opencode-skill/pull/1) (OpenCode v1/v2 support), LF line endings for Windows checkouts, and `opencode-go/deepseek-v4.1-flash#high` as the default model.
+> Fork of [pcx-wave/opencode-skill](https://github.com/pcx-wave/opencode-skill) (MIT). Adds upstream [PR 1](https://github.com/pcx-wave/opencode-skill/pull/1) (OpenCode v1/v2 support), LF line endings for Windows checkouts, `opencode-go/deepseek-v4.1-flash#high` as the default model, and first-class Google Antigravity support (skills under `.agents/skills/`, always-on rule for auto-mode, sandbox guidance).
 
 ![MIT License](https://img.shields.io/badge/license-MIT-blue.svg)
 
-**Claude orchestrates. OpenCode codes. You review the diff.**
+**The host agent orchestrates. OpenCode codes. You review the diff.**
 
-A Claude Code skill that delegates coding tasks to **OpenCode CLI** and supervises the result — the same pattern as [vibe-skill](https://github.com/pcx-wave/vibe-skill) and [gemini-skill](https://github.com/pcx-wave/gemini-skill).
+A skill for **Claude Code** and **Google Antigravity** (App, IDE, CLI) that delegates coding tasks to **OpenCode CLI** and supervises the result — the same pattern as [vibe-skill](https://github.com/pcx-wave/vibe-skill) and [gemini-skill](https://github.com/pcx-wave/gemini-skill).
 
 ---
 
 ## What it does
 
-When you type `/opencode <instruction>` in Claude Code, this skill:
+When you type `/opencode <instruction>` in Claude Code or Antigravity, this skill:
 
 1. Decomposes the task into atomic sub-tasks (if needed)
 2. Writes a self-contained prompt for OpenCode
@@ -27,44 +27,76 @@ When you type `/opencode <instruction>` in Claude Code, this skill:
 ## Prerequisites
 
 - [OpenCode CLI](https://opencode.ai) v1 or v2 installed (`opencode --version`; the free tier needs ≥1.18.0)
-- [Claude Code](https://claude.ai/code) with skills enabled
+- One host: [Claude Code](https://claude.ai/code) with skills enabled, or [Google Antigravity](https://antigravity.google) (App, IDE, or CLI `agy`)
 - `python3` available (for the streaming parser and syntax checks)
-- GNU `timeout` available — on macOS: `brew install coreutils`
+- GNU-style `timeout` — on macOS: `brew install coreutils` (the script picks up `gtimeout`)
 - A git repository to work in
 
 ---
 
 ## Installation
 
-```bash
-git clone https://github.com/pcx-wave/opencode-skill.git && cd opencode-skill && mkdir -p ~/tools ~/.claude/skills/opencode ~/.claude/skills/opencodeon ~/.claude/skills/opencodeoff ~/.claude/skills/opencodestatus ~/.claude/skills/opencode-model-pick ~/.claude/skills/opencode-model-clear && ln -sf "$(pwd)/tools/opencode-delegate" ~/tools/opencode-delegate && ln -sf "$(pwd)/tools/delegate-report" ~/tools/delegate-report && chmod +x ~/tools/opencode-delegate ~/tools/delegate-report && ln -sf "$(pwd)/SKILL.md" ~/.claude/skills/opencode/SKILL.md && ln -sf "$(pwd)/OPENCODEON.md" ~/.claude/skills/opencodeon/SKILL.md && ln -sf "$(pwd)/OPENCODEOFF.md" ~/.claude/skills/opencodeoff/SKILL.md && ln -sf "$(pwd)/OPENCODESTATUS.md" ~/.claude/skills/opencodestatus/SKILL.md && ln -sf "$(pwd)/OPENCODEMODELPICK.md" ~/.claude/skills/opencode-model-pick/SKILL.md && ln -sf "$(pwd)/OPENCODEMODELCLEAR.md" ~/.claude/skills/opencode-model-clear/SKILL.md
-```
-
-### Step-by-step
+Antigravity discovers skills in `.agents/skills/`; Claude Code reads `~/.claude/skills/`.
+Both installs are symlinks, so `git pull` keeps them current.
 
 ```bash
-# 1. Clone this repo
-git clone https://github.com/pcx-wave/opencode-skill.git
+git clone https://github.com/assistmeister/opencode-skill.git
 cd opencode-skill
 
-# 2. Install the scripts (symlinks — stay in sync with git pull)
+# 1. Install the scripts (symlinks — stay in sync with git pull)
 mkdir -p ~/tools
-ln -sf "$(pwd)/tools/opencode-delegate" ~/tools/opencode-delegate
-ln -sf "$(pwd)/tools/delegate-report" ~/tools/delegate-report
-chmod +x ~/tools/opencode-delegate ~/tools/delegate-report
+ln -sf "$PWD/tools/opencode-delegate" ~/tools/opencode-delegate
+ln -sf "$PWD/tools/delegate-report" ~/tools/delegate-report
+chmod +x "$PWD/tools/opencode-delegate" "$PWD/tools/delegate-report"
+
+# 2. Install the skills for Antigravity (App, IDE and CLI)
+mkdir -p ~/.gemini/config/skills
+for d in .agents/skills/*/; do n=$(basename "$d"); mkdir -p ~/.gemini/config/skills/"$n"
+  ln -sf "$PWD/$d/SKILL.md" ~/.gemini/config/skills/"$n"/SKILL.md; done
 
 # 3. Install the skills for Claude Code
-mkdir -p ~/.claude/skills/opencode ~/.claude/skills/opencodeon ~/.claude/skills/opencodeoff \
-         ~/.claude/skills/opencodestatus ~/.claude/skills/opencode-model-pick ~/.claude/skills/opencode-model-clear
-ln -sf "$(pwd)/SKILL.md" ~/.claude/skills/opencode/SKILL.md
-ln -sf "$(pwd)/OPENCODEON.md" ~/.claude/skills/opencodeon/SKILL.md
-ln -sf "$(pwd)/OPENCODEOFF.md" ~/.claude/skills/opencodeoff/SKILL.md
-ln -sf "$(pwd)/OPENCODESTATUS.md" ~/.claude/skills/opencodestatus/SKILL.md
-ln -sf "$(pwd)/OPENCODEMODELPICK.md" ~/.claude/skills/opencode-model-pick/SKILL.md
-ln -sf "$(pwd)/OPENCODEMODELCLEAR.md" ~/.claude/skills/opencode-model-clear/SKILL.md
+mkdir -p ~/.claude/skills
+for d in .agents/skills/*/; do n=$(basename "$d"); mkdir -p ~/.claude/skills/"$n"
+  ln -sf "$PWD/$d/SKILL.md" ~/.claude/skills/"$n"/SKILL.md; done
+```
 
-# 4. (Optional) Enable auto-mode — Claude delegates all code tasks automatically
-#    without requiring /opencode each time. Toggle with /opencodeon and /opencodeoff.
+### Antigravity quickstart
+
+```bash
+agy             # inside the project OpenCode should work on
+/skills reload  # after installing or updating
+/opencode add a dark mode toggle to the settings page
+```
+
+Every skill becomes a slash command (`/opencode`, `/opencodeon`, `/opencodestatus`,
+`/opencode-report`, …). Skills committed under `.agents/skills/` are also discovered when
+you open this repository itself.
+
+Antigravity additionally loads `~/.gemini/antigravity-cli/skills/` and `~/.gemini/skills/`,
+which **override** `~/.gemini/config/skills/`. Remove stale copies there if an old version
+wins.
+
+Auto-mode needs no `CLAUDE.md` edit in Antigravity: `/opencodeon` writes
+`~/.gemini/config/rules/opencode-auto.md` (an `always_on` rule) and `/opencodeoff` deletes it.
+
+### Antigravity terminal sandbox
+
+The default permission preset runs agent shell commands in a sandbox with no network and
+writes limited to the workspace and temp dirs. The delegate needs network access, so run it
+outside the sandbox — approve the agent's request, or add to the Allow list:
+
+```
+command(~/tools/opencode-delegate)
+```
+
+Toggling auto-mode writes under `~/.gemini`, so `/opencodeon` and `/opencodeoff` may need
+one approval too.
+
+### Claude Code auto-mode
+
+Append the auto-mode block once (Claude only — Antigravity uses the rule file above):
+
+```bash
 grep -q "opencode auto-mode" ~/.claude/CLAUDE.md 2>/dev/null || cat >> ~/.claude/CLAUDE.md << 'EOF'
 
 # opencode auto-mode
@@ -80,12 +112,11 @@ EOF
 ### Verify the install
 
 ```bash
-# Check opencode is available
 opencode --version
-
-# Test the delegate script
 ~/tools/opencode-delegate /tmp "Say hello in one sentence." 60
 # Should print: [opencode] Hello! ...
+
+test -f ~/.gemini/config/skills/opencode/SKILL.md && echo "Antigravity skill linked"
 ```
 
 ### Updating
@@ -97,12 +128,14 @@ cd ~/opencode-skill && git pull
 ```
 
 `~/tools/opencode-delegate` and all skill files are automatically up to date — no re-copy needed.
+On Windows, Git Bash copies instead of symlinking unless Developer Mode and
+`MSYS=winsymlinks:nativestrict` are set; re-run the install loop after each pull.
 
 ---
 
 ## Usage
 
-In a Claude Code session, just describe what you want:
+In a Claude Code or Antigravity session, just describe what you want:
 
 ```
 /opencode add a dark mode toggle to the settings page
@@ -118,7 +151,7 @@ Claude will decompose the task, write the OpenCode prompt, supervise execution, 
 
 ## Auto-delegate mode
 
-For frictionless delegation, enable auto-mode once in your Claude Code session:
+For frictionless delegation, enable auto-mode once in your session:
 
 ```
 /opencodeon      — every code request is automatically delegated to OpenCode
@@ -188,7 +221,9 @@ Real token counts and cost are printed after every run and appended to the run l
 | `--auto` / `--dangerously-skip-permissions` (v1 ≤1.15) | All tools auto-approved (safe with post-run review); flag auto-detected |
 | Free model delays | May have queue during peak usage |
 | No `--dir` flag in v2 | Script `cd`s into workdir (v1 also gets `--dir`) |
-| Needs GNU `timeout` | Not in macOS by default — `brew install coreutils` |
+| Needs GNU `timeout` | Not in macOS by default — `brew install coreutils`; the script uses `gtimeout` when present |
+| Antigravity terminal sandbox | Default preset has no network and no write access outside the workspace; the delegate must run unsandboxed (`command(~/tools/opencode-delegate)`) |
+| Windows | Git Bash copies instead of symlinking unless Developer Mode + `MSYS=winsymlinks:nativestrict`; `timeout.exe` is rejected, so use WSL or Git Bash with GNU coreutils |
 
 ---
 

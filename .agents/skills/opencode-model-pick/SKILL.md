@@ -1,15 +1,18 @@
 ---
 name: opencode-model-pick
-description: Override the OpenCode model for all subsequent delegations. Usage: /opencode-model-pick <model>
+description: >
+  Overrides the OpenCode model for all subsequent delegations. Usage:
+  /opencode-model-pick <model>. Only when the user explicitly invokes it — never on its own.
 license: MIT
 user-invocable: true
+disable-model-invocation: true
 allowed-tools:
-  - bash
+  - Bash
 ---
 
 # /opencode-model-pick
 
-Run: `echo "<model>" > ~/.local/share/opencode-model.flag`
+Run: `mkdir -p ~/.local/share && echo "<model>" > ~/.local/share/opencode-model.flag`
 
 Then confirm: "OpenCode model set to <model> — all delegations will use this model until cleared."
 

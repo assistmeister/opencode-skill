@@ -1,10 +1,13 @@
 ---
 name: opencode-model-clear
-description: Clear the OpenCode model override and return to the default model.
+description: >
+  Clears the OpenCode model override and returns to the default model. Only when the
+  user explicitly invokes /opencode-model-clear — never on its own.
 license: MIT
 user-invocable: true
+disable-model-invocation: true
 allowed-tools:
-  - bash
+  - Bash
 ---
 
 # /opencode-model-clear

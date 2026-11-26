@@ -37,6 +37,15 @@ fi
 
 cd "$WORKDIR" || exit 1
 
+# Preflight: python3 runs the stream parser; timeout must be GNU-style.
+# `timeout 1 true` rejects Windows timeout.exe (which wants /T) and missing binaries.
+command -v python3 >/dev/null 2>&1 || { echo "ERROR: python3 not found" >&2; exit 1; }
+TIMEOUT_BIN=$(command -v gtimeout || command -v timeout)
+if [ -z "$TIMEOUT_BIN" ] || ! "$TIMEOUT_BIN" 1 true >/dev/null 2>&1; then
+  echo "ERROR: GNU timeout not found (macOS: brew install coreutils; then use gtimeout)" >&2
+  exit 1
+fi
+
 # Detect run flags from `opencode run --help` — they changed within v1, not at v2:
 #   <=1.15: --dangerously-skip-permissions, --dir   1.19: --auto, --dir   2.x: --auto only
 OC_VERSION=$(opencode --version 2>/dev/null | head -1)
@@ -51,10 +60,17 @@ if printf '%s' "$OC_HELP" | grep -q -- '--dir'; then
   OC_FLAGS+=(--dir "$WORKDIR")
 fi
 
-START_NS=$(date +%s%N)
+START_NS=$(python3 -c 'import time; print(int(time.time()*1e9))')
 PROMPT_WORDS=$(printf '%s' "$PROMPT" | wc -w | tr -d ' ')
 GIT_BEFORE=$(git rev-parse HEAD 2>/dev/null || echo "no-git")
-SENTINEL=$(mktemp /tmp/opencode-sentinel-XXXXXX)
+# BSD mktemp (macOS) requires the Xs at the very end — no file extensions.
+TMPD="${TMPDIR:-/tmp}"
+[ -d "$TMPD" ] && [ -w "$TMPD" ] || TMPD=/tmp
+SENTINEL=$(mktemp "$TMPD/opencode-sentinel.XXXXXX")
+PROMPT_FILE=$(mktemp "$TMPD/opencode-prompt.XXXXXX")
+DELEGATE_STATS_FILE=$(mktemp "$TMPD/delegate-stats.XXXXXX")
+SYNTAX_COUNT_FILE=$(mktemp "$TMPD/opencode-syntax-count.XXXXXX")
+echo 0 > "$SYNTAX_COUNT_FILE"
 
 echo "=== OPENCODE START ==="
 echo "Workdir : $WORKDIR"
@@ -66,14 +82,10 @@ echo "======================"
 
 # Write prompt to a temp file for consistent handling; content is loaded into
 # a double-quoted variable before passing as a positional arg to opencode run.
-PROMPT_FILE=$(mktemp /tmp/opencode-prompt-XXXXXX.txt)
-
-# Stats handoff file: Python parser writes JSON here; bash reads it for the log.
-DELEGATE_STATS_FILE=$(mktemp /tmp/delegate-stats-XXXXXX.json)
 printf '{}' > "$DELEGATE_STATS_FILE"
 export DELEGATE_STATS_FILE
 
-trap 'rm -f "$PROMPT_FILE" "$DELEGATE_STATS_FILE" "$SYNTAX_COUNT_FILE" "$SENTINEL" /tmp/opencode-syntax-err.txt' EXIT
+trap 'rm -f "$PROMPT_FILE" "$DELEGATE_STATS_FILE" "$SYNTAX_COUNT_FILE" "$SENTINEL"' EXIT
 printf '%s' "$PROMPT" > "$PROMPT_FILE"
 
 PROMPT_CONTENT=$(cat "$PROMPT_FILE")
@@ -82,7 +94,7 @@ PROMPT_CONTENT=$(cat "$PROMPT_FILE")
 # opencode works fine in a plain pipe — no pseudo-TTY needed.
 # stdin is closed: opencode v2 reads a non-TTY stdin as extra prompt input and waits for EOF.
 export OPENCODE_RUN_MODE="opencode-delegate"
-timeout "$TIMEOUT_SECS" opencode run "$PROMPT_CONTENT" \
+"$TIMEOUT_BIN" "$TIMEOUT_SECS" opencode run "$PROMPT_CONTENT" \
   --format json \
   "${OC_FLAGS[@]}" \
   --model "$MODEL" \
@@ -248,8 +260,6 @@ fi
 CHANGED=$(find . -type f -newer "$SENTINEL" -not -path './.git/*' 2>/dev/null | sed 's|^\./||')
 FILES_CHANGED_COUNT=$(printf '%s\n' "$CHANGED" | grep -c '[^[:space:]]' 2>/dev/null || echo 0)
 
-SYNTAX_COUNT_FILE=$(mktemp /tmp/opencode-syntax-count-XXXXXX.txt)
-echo 0 > "$SYNTAX_COUNT_FILE"
 export DELEGATE_CHANGED="$CHANGED"
 export SYNTAX_COUNT_FILE
 
@@ -333,7 +343,7 @@ else
 fi
 
 # ── Run log ────────────────────────────────────────────────────────────────────
-END_NS=$(date +%s%N)
+END_NS=$(python3 -c 'import time; print(int(time.time()*1e9))')
 FILES_CHANGED_COUNT=${FILES_CHANGED_COUNT:-0}
 TOTAL_ERRORS=${TOTAL_ERRORS:-0}
 
@@ -349,12 +359,17 @@ export DELEGATE_START_NS="$START_NS"
 export DELEGATE_END_NS="$END_NS"
 
 python3 << 'PYLOG'
-import json, os
+import json, os, sys
 from pathlib import Path
 from datetime import datetime, timezone
 
 LOG = Path.home() / '.local' / 'share' / 'delegate-runs.jsonl'
-LOG.parent.mkdir(parents=True, exist_ok=True)
+LOG_HINT = ' (Antigravity sandbox blocks ~/.local/share — run the delegate unsandboxed)'
+try:
+    LOG.parent.mkdir(parents=True, exist_ok=True)
+except OSError as e:
+    print(f'[log] SKIPPED — {LOG}: {e}{LOG_HINT}', file=sys.stderr)
+    LOG = None
 
 sf = os.environ.get('DELEGATE_STATS_FILE', '')
 stats = {}
@@ -402,13 +417,16 @@ entry['wrote_nothing'] = (
     and entry.get('exit_code', 0) == 0
 )
 
-with open(LOG, 'a') as f:
-    f.write(json.dumps(entry) + '\n')
-
-tok = entry.get('tokens_total', '?')
-saved = entry['cost_claude_eq'] - entry.get('cost_usd', 0)
-saved_str = f', saved ~${saved:.4f} vs Claude' if saved > 0 else ''
-print(f'[log] → {LOG}  ({tok} tokens, exit {entry["exit_code"]}, {duration}s{saved_str})')
+if LOG is not None:
+    try:
+        with open(LOG, 'a') as f:
+            f.write(json.dumps(entry) + '\n')
+        tok = entry.get('tokens_total', '?')
+        saved = entry['cost_claude_eq'] - entry.get('cost_usd', 0)
+        saved_str = f', saved ~${saved:.4f} vs Claude' if saved > 0 else ''
+        print(f'[log] → {LOG}  ({tok} tokens, exit {entry["exit_code"]}, {duration}s{saved_str})')
+    except OSError as e:
+        print(f'[log] SKIPPED — {LOG}: {e}{LOG_HINT}', file=sys.stderr)
 PYLOG
 
 exit $OPENCODE_EXIT
